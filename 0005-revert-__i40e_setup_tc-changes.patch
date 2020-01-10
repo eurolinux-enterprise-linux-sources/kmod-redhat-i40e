@@ -1,0 +1,30 @@
+Reverts commits kernel-3.10.0-773.el7-399-ga9cf64b,
+kernel-3.10.0-773.el7-396-g29a1baf, kernel-3.10.0-773.el7-387-g43ccc74 with
+a minor adjustment for the removal of FCoE code in
+kernel-3.10.0-774.el7-35-g5090226.
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:07:15.483478159 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:09:22.149114689 +0100
+@@ -5503,17 +5503,16 @@
+ 	return ret;
+ }
+ 
+-static int __i40e_setup_tc(struct net_device *netdev, enum tc_setup_type type,
+-			   void *type_data)
++static int __i40e_setup_tc(struct net_device *netdev, u32 handle,
++			   u32 chain_index, __be16 proto,
++			   struct tc_to_netdev *tc)
+ {
+-	struct tc_mqprio_qopt *mqprio = type_data;
+-
+-	if (type != TC_SETUP_MQPRIO)
++	if (tc->type != TC_SETUP_MQPRIO)
+ 		return -EOPNOTSUPP;
+ 
+-	mqprio->hw = TC_MQPRIO_HW_OFFLOAD_TCS;
++	tc->mqprio->hw = TC_MQPRIO_HW_OFFLOAD_TCS;
+ 
+-	return i40e_setup_tc(netdev, mqprio->num_tc);
++	return i40e_setup_tc(netdev, tc->mqprio->num_tc);
+ }
+ 
+ /**

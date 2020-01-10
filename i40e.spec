@@ -1,31 +1,42 @@
 %define kmod_name		i40e
 %define kmod_vendor		redhat
-%define kmod_driver_version	1.6.27_k_dup7.3
-%define kmod_rpm_release	1
-%define kmod_kernel_version	3.10.0-514.el7
+%define kmod_driver_version	2.1.14_k_dup7.4
+%define kmod_rpm_release	2.1
+%define kmod_kernel_version	3.10.0-693.el7
 %define kmod_kbuild_dir		drivers/net/ethernet/intel/i40e
 %define kmod_dependencies       %{nil}
 %define kmod_build_dependencies	%{nil}
 %define kmod_devel_package	0
 
-%{!?dist: %define dist .el7_3}
+%{!?dist: %define dist .el7_4}
+%{!?make_build: %define make_build make}
 
 Source0:	%{kmod_name}-%{kmod_vendor}-%{kmod_driver_version}.tar.bz2
 # Source code patches
-Patch0:	0000-add-backport-compat-header.patch
-Patch1:	0001-udp_tunnel_get_rx_info.patch
-Patch2:	0002-fake-features.patch
-Patch3:	0003-pci-request-release-mem-regions.patch
-Patch4:	0004-revert-ndo_dflt_bridge_getlink.patch
-Patch5:	0005-revert-Update-API-for-VF-vlan-protocol-802_1ad-support.patch
-Patch6:	0006-hlist_add_behind.patch
-Patch7:	0007-csum_replace_by_diff.patch
-Patch8:	0008-bump-version.patch
+Patch0:	0000-introduce-backport-compat-header.patch
+Patch1:	0001-add-gmb-macro.patch
+Patch2:	0002-revert-netdrv-i40e-i40evf-adjust-packet-size-to-account-for.patch
+Patch3:	0003-revert-intel-use-core-min-max-MTU-checking.patch
+Patch4:	0004-revert-net-add-a-postfix-to-old-ndo_change_mtu.patch
+Patch5:	0005-revert-__i40e_setup_tc-changes.patch
+Patch6:	0006-revert-net-rename-ndo_setup_tc-callback-and-remove-it-from-.patch
+Patch7:	0007-revert-net-mqprio-Modify-mqprio-to-pass-user-parameters-via.patch
+Patch8:	0008-revert-net-make-ndo_get_stats64-a-void-function.patch
+Patch9:	0009-revert-net-ethernet-update-drivers-to-handle-HWTSTAMP_FILTE.patch
+Patch10:	0010-backport-__page_frag_cache_drain.patch
+Patch11:	0011-revert-net-propagate-tc-filter-chain-index-down-the-ndo_set.patch
+Patch12:	0012-backport-dma_map-unmap_page_attrs.patch
+Patch13:	0013-bump-driver-version.patch
+Patch14:	0015-add-retpoline-modinfo-flag.patch
 
 %define findpat %( echo "%""P" )
 %define __find_requires /usr/lib/rpm/redhat/find-requires.ksyms
 %define __find_provides /usr/lib/rpm/redhat/find-provides.ksyms %{kmod_name} %{?epoch:%{epoch}:}%{version}-%{release}
 %define sbindir %( if [ -d "/sbin" -a \! -h "/sbin" ]; then echo "/sbin"; else echo %{_sbindir}; fi )
+%define dup_state_dir %{_localstatedir}/lib/rpm-state/kmod-dups
+%define kver_state_dir %{dup_state_dir}/kver
+%define kver_state_file %{kver_state_dir}/%{kmod_kernel_version}.%(arch)
+%define dup_module_list %{dup_state_dir}/rpm-kmod-%{kmod_name}-modules
 
 Name:		kmod-redhat-i40e
 Version:	%{kmod_driver_version}
@@ -44,8 +55,8 @@ Provides:	kernel-modules = %kmod_kernel_version.%{_target_cpu}
 Provides:	kmod-%{kmod_name} = %{?epoch:%{epoch}:}%{version}-%{release}
 Requires(post):	%{sbindir}/weak-modules
 Requires(postun):	%{sbindir}/weak-modules
-Requires:	kernel >= 3.10.0-514.el7
-Requires:	kernel < 3.10.0-515.el7
+Requires:	kernel >= 3.10.0-693.el7
+Requires:	kernel < 3.10.0-694.el7
 %if 0
 Requires: firmware(%{kmod_name}) = ENTER_FIRMWARE_VERSION
 %endif
@@ -62,6 +73,9 @@ Conflicts:	kmod-%{kmod_name}
 %description
 i40e module for Driver Update Program
 
+This RPM has been provided by Red Hat for testing purposes only and is
+NOT supported for any other use. This RPM should NOT be deployed for
+purposes other than testing and debugging.
 %if 0
 
 %package -n kmod-redhat-i40e-firmware
@@ -72,6 +86,9 @@ Provides:	kernel-modules = %{kmod_kernel_version}.%{_target_cpu}
 %description -n  kmod-redhat-i40e-firmware
 i40e firmware for Driver Update Program
 
+This RPM has been provided by Red Hat for testing purposes only and is
+NOT supported for any other use. This RPM should NOT be deployed for
+purposes other than testing and debugging.
 
 %files -n kmod-redhat-i40e-firmware
 %defattr(644,root,root,755)
@@ -83,12 +100,16 @@ i40e firmware for Driver Update Program
 %if 0%{kmod_devel_package}
 %package -n kmod-redhat-i40e-devel
 Version:	%{kmod_driver_version}
-Requires:	kernel >= 3.10.0-514.el7
-Requires:	kernel < 3.10.0-515.el7
-Summary:	%{DEVEL_SUMMARY}
+Requires:	kernel >= 3.10.0-693.el7
+Requires:	kernel < 3.10.0-694.el7
+Summary:	i40e development files for Driver Update Program
 
 %description -n  kmod-redhat-i40e-devel
-%{DEVEL_DESCRIPTION_CONTENT}
+i40e development files for Driver Update Program
+
+This RPM has been provided by Red Hat for testing purposes only and is
+NOT supported for any other use. This RPM should NOT be deployed for
+purposes other than testing and debugging.
 
 %files -n kmod-redhat-i40e-devel
 %defattr(644,root,root,755)
@@ -97,15 +118,71 @@ Summary:	%{DEVEL_SUMMARY}
 
 %post
 modules=( $(find /lib/modules/%{kmod_kernel_version}.%(arch)/extra/kmod-%{kmod_vendor}-%{kmod_name} | grep '\.ko$') )
-printf '%s\n' "${modules[@]}" | %{sbindir}/weak-modules --add-modules
+printf '%s\n' "${modules[@]}" | %{sbindir}/weak-modules --add-modules --no-initramfs
+
+mkdir -p "%{kver_state_dir}"
+touch "%{kver_state_file}"
+
+exit 0
+
+%posttrans
+# We have to re-implement part of weak-modules here because it doesn't allow
+# calling initramfs regeneration separately
+if [ -f "%{kver_state_file}" ]; then
+	kver_base="%{kmod_kernel_version}"
+	kvers=$(ls -d "/lib/modules/${kver_base%%.*}"*)
+
+	for k_dir in $kvers; do
+		k="${k_dir#/lib/modules/}"
+
+		tmp_initramfs="/boot/initramfs-$k.tmp"
+		dst_initramfs="/boot/initramfs-$k.img"
+
+		# The same check as in weak-modules: we assume that the kernel present
+		# if the symvers file exists.
+		if [ -e "/boot/symvers-$k.gz" ]; then
+			/usr/bin/dracut -f "$tmp_initramfs" "$k" || exit 1
+			cmp -s "$tmp_initramfs" "$dst_initramfs"
+			if [ "$?" = 1 ]; then
+				mv "$tmp_initramfs" "$dst_initramfs"
+			else
+				rm -f "$tmp_initramfs"
+			fi
+		fi
+	done
+
+	rm -f "%{kver_state_file}"
+	rmdir "%{kver_state_dir}" 2> /dev/null
+fi
+
+rmdir "%{dup_state_dir}" 2> /dev/null
+
+exit 0
 
 %preun
-rpm -ql kmod-redhat-i40e-%{kmod_driver_version}-%{kmod_rpm_release}%{?dist}.$(arch) | grep '\.ko$' > /var/run/rpm-kmod-%{kmod_name}-modules
+if rpm -q --filetriggers kmod 2> /dev/null| grep -q "Trigger for weak-modules call on kmod removal"; then
+	mkdir -p "%{kver_state_dir}"
+	touch "%{kver_state_file}"
+fi
+
+mkdir -p "%{dup_state_dir}"
+rpm -ql kmod-redhat-i40e-%{kmod_driver_version}-%{kmod_rpm_release}%{?dist}.$(arch) | \
+	grep '\.ko$' > "%{dup_module_list}"
 
 %postun
-modules=( $(cat /var/run/rpm-kmod-%{kmod_name}-modules) )
-rm /var/run/rpm-kmod-%{kmod_name}-modules
-printf '%s\n' "${modules[@]}" | %{sbindir}/weak-modules --remove-modules
+if rpm -q --filetriggers kmod 2> /dev/null| grep -q "Trigger for weak-modules call on kmod removal"; then
+	initramfs_opt="--no-initramfs"
+else
+	initramfs_opt=""
+fi
+
+modules=( $(cat "%{dup_module_list}") )
+rm -f "%{dup_module_list}"
+printf '%s\n' "${modules[@]}" | %{sbindir}/weak-modules --remove-modules $initramfs_opt
+
+rmdir "%{dup_state_dir}" 2> /dev/null
+
+exit 0
 
 %files
 %defattr(644,root,root,755)
@@ -125,6 +202,12 @@ printf '%s\n' "${modules[@]}" | %{sbindir}/weak-modules --remove-modules
 %patch6 -p1
 %patch7 -p1
 %patch8 -p1
+%patch9 -p1
+%patch10 -p1
+%patch11 -p1
+%patch12 -p1
+%patch13 -p1
+%patch14 -p1
 set -- *
 mkdir source
 mv "$@" source/
@@ -133,8 +216,10 @@ mkdir obj
 %build
 rm -rf obj
 cp -r source obj
-make -C %{kernel_source} M=$PWD/obj/%{kmod_kbuild_dir} \
-	NOSTDINC_FLAGS="-I $PWD/obj/include -I $PWD/obj/include/uapi"
+%{make_build} -C %{kernel_source} V=1 M=$PWD/obj/%{kmod_kbuild_dir} \
+	NOSTDINC_FLAGS="-I $PWD/obj/include -I $PWD/obj/include/uapi" \
+	EXTRA_CFLAGS="-mindirect-branch=thunk-inline -mindirect-branch-register" \
+	%{nil}
 # mark modules executable so that strip-to-file can strip them
 find obj/%{kmod_kbuild_dir} -name "*.ko" -type f -exec chmod u+x '{}' +
 
@@ -177,7 +262,13 @@ install -m 644 -D $PWD/obj/%{kmod_kbuild_dir}/Module.symvers $RPM_BUILD_ROOT/usr
 rm -rf $RPM_BUILD_ROOT
 
 %changelog
-* Wed May 24 2017 Eugene Syromiatnikov <esyr@redhat.com> 1.6.27_k_dup7.3-1
-- Resolves: #bz1448412
-- af7d3667969d1dedc990b0aa47458756796961c6
+* Thu Mar 15 2018 Eugene Syromiatnikov <esyr@redhat.com> 2.1.14_k_dup7.4-2.1
+- Added modinfo flag for retpoline.
+- Resolves: #bz1549986
+
+* Thu Mar 01 2018 Eugene Syromiatnikov <esyr@redhat.com> 2.1.14_k_dup7.4-2
+- Rebuilt with -mindirect-branch=thunk-inline -mindirect-branch-register flags.
+
+* Tue Feb 27 2018 Eugene Syromiatnikov <esyr@redhat.com> 2.1.14_k_dup7.4-1
+- 141332170ff595319ce42a2cfc2944c2cbb11b4f
 - i40e module for Driver Update Program

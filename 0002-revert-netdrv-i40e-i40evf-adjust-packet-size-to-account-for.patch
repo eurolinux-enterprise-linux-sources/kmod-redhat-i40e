@@ -1,0 +1,29 @@
+Revert 70077a0668f7 "[netdrv] i40e/i40evf: adjust packet size to account for
+double VLANs" (upstream 1e3a5fd5c049), as network stack in 7.4 doesn't have such
+functionality.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 06:09:37.754100429 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 06:33:45.788030505 +0100
+@@ -9610,7 +9610,8 @@
+ 
+ 	/* MTU range: 68 - 9706 */
+ 	netdev->extended->min_mtu = ETH_MIN_MTU;
+-	netdev->extended->max_mtu = I40E_MAX_RXBUFFER - I40E_PACKET_HDR_PAD;
++	netdev->extended->max_mtu = I40E_MAX_RXBUFFER -
++			  (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
+ 
+ 	return 0;
+ }
+Index: src/drivers/net/ethernet/intel/i40e/i40e_txrx.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_txrx.h	2018-02-27 06:09:37.760100380 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_txrx.h	2018-02-27 06:33:45.789030495 +0100
+@@ -132,7 +132,6 @@
+  * i.e. RXBUFFER_512 --> 1216 byte skb (size-2048 slab)
+  */
+ #define I40E_RX_HDR_SIZE I40E_RXBUFFER_256
+-#define I40E_PACKET_HDR_PAD (ETH_HLEN + ETH_FCS_LEN + (VLAN_HLEN * 2))
+ #define i40e_rx_desc i40e_32byte_rx_desc
+ 
+ #if 0 /* cannot use combined I40E_RX_DMA_ATTR in RHEL7 */

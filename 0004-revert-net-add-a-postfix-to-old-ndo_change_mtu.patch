@@ -1,0 +1,41 @@
+Revert 515e886a2e5d "[net] add a postfix to old ndo_change_mtu", as network
+stack in 7.4 uses ndo_change_mtu method.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_debugfs.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_debugfs.c	2018-02-27 06:42:04.536683428 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_debugfs.c	2018-02-27 06:43:53.343508550 +0100
+@@ -1739,7 +1739,7 @@
+ 			dev_info(&pf->pdev->dev, "change_mtu: no netdev for VSI %d\n",
+ 				 vsi_seid);
+ 		} else if (rtnl_trylock()) {
+-			vsi->netdev->netdev_ops->ndo_change_mtu_rh74(vsi->netdev,
++			vsi->netdev->netdev_ops->ndo_change_mtu(vsi->netdev,
+ 								mtu);
+ 			rtnl_unlock();
+ 			dev_info(&pf->pdev->dev, "change_mtu called\n");
+Index: src/drivers/net/ethernet/intel/i40e/i40e_fcoe.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_fcoe.c	2018-02-27 06:09:37.751100454 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_fcoe.c	2018-02-27 06:43:53.343508550 +0100
+@@ -1458,7 +1458,7 @@
+ 	.ndo_set_rx_mode	= i40e_set_rx_mode,
+ 	.ndo_validate_addr	= eth_validate_addr,
+ 	.ndo_set_mac_address	= i40e_set_mac,
+-	.ndo_change_mtu_rh74	= i40e_fcoe_change_mtu,
++	.ndo_change_mtu		= i40e_fcoe_change_mtu,
+ 	.ndo_do_ioctl		= i40e_ioctl,
+ 	.ndo_tx_timeout		= i40e_tx_timeout,
+ 	.ndo_vlan_rx_add_vid	= i40e_vlan_rx_add_vid,
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 06:42:04.538683407 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 06:43:53.345508529 +0100
+@@ -9456,7 +9456,7 @@
+ 	.ndo_set_rx_mode	= i40e_set_rx_mode,
+ 	.ndo_validate_addr	= eth_validate_addr,
+ 	.ndo_set_mac_address	= i40e_set_mac,
+-	.ndo_change_mtu_rh74	= i40e_change_mtu,
++	.ndo_change_mtu		= i40e_change_mtu,
+ 	.ndo_do_ioctl		= i40e_ioctl,
+ 	.ndo_tx_timeout		= i40e_tx_timeout,
+ 	.ndo_vlan_rx_add_vid	= i40e_vlan_rx_add_vid,

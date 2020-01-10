@@ -1,0 +1,15 @@
+Revert fb7878069c3f "[net] ethernet: update drivers to handle
+HWTSTAMP_FILTER_NTP_ALL" (upstream e3412575488a) as network stack in 7.4
+doesn't have support for it.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_ptp.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_ptp.c	2018-02-27 06:09:37.756100413 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_ptp.c	2018-02-27 07:27:32.166921545 +0100
+@@ -599,7 +599,6 @@
+ 			config->rx_filter = HWTSTAMP_FILTER_PTP_V2_L2_EVENT;
+ 		}
+ 		break;
+-	case HWTSTAMP_FILTER_NTP_ALL:
+ 	case HWTSTAMP_FILTER_ALL:
+ 	default:
+ 		return -ERANGE;

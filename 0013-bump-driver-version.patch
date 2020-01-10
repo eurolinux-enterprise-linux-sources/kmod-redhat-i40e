@@ -1,0 +1,15 @@
+Provide "_dup7.4" suffix to the driver version in order to differentiate it
+from the inbox driver.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 16:06:22.520410354 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 16:14:22.974242570 +0100
+@@ -43,7 +43,7 @@
+ static const char i40e_driver_string[] =
+ 			"Intel(R) Ethernet Connection XL710 Network Driver";
+ 
+-#define DRV_KERN "-k"
++#define DRV_KERN "-k_dup7.4"
+ 
+ #define DRV_VERSION_MAJOR 2
+ #define DRV_VERSION_MINOR 1

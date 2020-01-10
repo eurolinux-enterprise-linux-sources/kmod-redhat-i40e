@@ -1,0 +1,19 @@
+Revert 704950d754c1 "[net] propagate tc filter chain index down the ndo_setup_tc
+call" (upstream a5fcf8a6c968) as network stack in 7.4 uses old ndo_setup_tc
+method API.
+
+Adjusted for the removal of FCoE code.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:20:41.266053494 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 15:50:47.065654728 +0100
+@@ -5507,8 +5507,7 @@
+ }
+ 
+ static int __i40e_setup_tc(struct net_device *netdev, u32 handle,
+-			   u32 chain_index, __be16 proto,
+-			   struct tc_to_netdev *tc)
++			   __be16 proto, struct tc_to_netdev *tc)
+ {
+ 	if (handle != TC_H_ROOT || tc->type != TC_SETUP_MQPRIO)
+ 		return -EINVAL;

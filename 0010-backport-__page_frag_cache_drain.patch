@@ -1,0 +1,42 @@
+New code for page fault handling introduced in commit efc1c93b7b3e
+"[netdrv] i40e/i40evf: Update code to better handle incrementing page count"
+(upstream 1793668c3b8c) relies on recenetly introduced __page_frag_cache_drain
+function (initially introduced as __page_frag_drain in 8cbd9354f14f "[mm] add
+support for releasing multiple instances of a page", upstream 44fdffd70504, and
+then updated in 4f21fc318c16 "[mm] rename __page_frag functions to
+__page_frag_cache, drop order from drain", upstream 2976db801853), so it's
+re-implemented in backport compat header using page_ref_sub_and_test and
+__free_pages.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2018-03-02 07:28:55.007505719 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2018-03-02 08:17:41.508592934 +0100
+@@ -7,4 +7,15 @@
+  */
+ #define gmb() alternative(ASM_NOP3, "lfence", X86_FEATURE_LFENCE_RDTSC)
+ 
++static inline void __page_frag_cache_drain(struct page *page, unsigned int count)
++{
++	VM_BUG_ON_PAGE(page_ref_count(page) == 0, page);
++
++	if (count > 0) {
++		VM_BUG_ON_PAGE(page_ref_sub_and_test(page, count - 1), page);
++
++		__free_pages(page, compound_order(page));
++	}
++}
++
+ #endif /* I40E_BACKPORT_COMPATH_H */
+Index: src/drivers/net/ethernet/intel/i40e/i40e_txrx.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_txrx.c	2018-03-02 07:28:54.146509517 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_txrx.c	2018-03-02 07:28:55.314504365 +0100
+@@ -30,6 +30,8 @@
+ #include "i40e_trace.h"
+ #include "i40e_prototype.h"
+ 
++#include "i40e_backport_compat.h"
++
+ static inline __le64 build_ctob(u32 td_cmd, u32 td_offset, unsigned int size,
+ 				u32 td_tag)
+ {

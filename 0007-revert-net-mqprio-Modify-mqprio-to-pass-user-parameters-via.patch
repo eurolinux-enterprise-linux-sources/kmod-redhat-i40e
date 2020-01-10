@@ -1,0 +1,33 @@
+Revert 00fc39e9c916 "[net] sched: change return value of ndo_setup_tc for driver
+supporting mqprio only" (upstream 38cf0426e517) and ea7abf0ae685 "[net] mqprio:
+Modify mqprio to pass user parameters via ndo_setup_tc" (upstream 56f36acd215c)
+as network stack in 7.4 still uses the old interface for ndo_setup_tc method.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:03:45.025730866 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:05:02.870901050 +0100
+@@ -5507,12 +5507,9 @@
+ 			   u32 chain_index, __be16 proto,
+ 			   struct tc_to_netdev *tc)
+ {
+-	if (tc->type != TC_SETUP_MQPRIO)
+-		return -EOPNOTSUPP;
+-
+-	tc->mqprio->hw = TC_MQPRIO_HW_OFFLOAD_TCS;
+-
+-	return i40e_setup_tc(netdev, tc->mqprio->num_tc);
++	if (handle != TC_H_ROOT || tc->type != TC_SETUP_MQPRIO)
++		return -EINVAL;
++	return i40e_setup_tc(netdev, tc->tc);
+ }
+ 
+ /**
+@@ -9463,7 +9458,7 @@
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller	= i40e_netpoll,
+ #endif
+-	.extended.ndo_setup_tc	= __i40e_setup_tc,
++	.ndo_setup_tc		= __i40e_setup_tc,
+ 	.ndo_set_features	= i40e_set_features,
+ 	.ndo_set_vf_mac		= i40e_ndo_set_vf_mac,
+ 	.extended.ndo_set_vf_vlan	= i40e_ndo_set_vf_port_vlan,

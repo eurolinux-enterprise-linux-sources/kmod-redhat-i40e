@@ -1,0 +1,42 @@
+Provide implementations of dma_map_page_attrs and dma_unmap_page_attrs from
+7.5's include/linux/dma-mapping.h.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2018-03-02 08:17:41.508592934 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2018-03-02 08:17:49.700503090 +0100
+@@ -18,4 +18,35 @@
+ 	}
+ }
+ 
++static inline dma_addr_t dma_map_page_attrs(struct device *dev,
++					    struct page *page,
++					    size_t offset, size_t size,
++					    enum dma_data_direction dir,
++					    struct dma_attrs *attrs)
++{
++	struct dma_map_ops *ops = get_dma_ops(dev);
++	dma_addr_t addr;
++
++	kmemcheck_mark_initialized(page_address(page) + offset, size);
++	BUG_ON(!valid_dma_direction(dir));
++	addr = ops->map_page(dev, page, offset, size, dir, attrs);
++	debug_dma_map_page(dev, page, offset, size, dir, addr, false);
++
++	return addr;
++}
++
++static inline void dma_unmap_page_attrs(struct device *dev,
++					dma_addr_t addr, size_t size,
++					enum dma_data_direction dir,
++					struct dma_attrs *attrs)
++{
++	struct dma_map_ops *ops = get_dma_ops(dev);
++
++	BUG_ON(!valid_dma_direction(dir));
++	if (ops->unmap_page)
++		ops->unmap_page(dev, addr, size, dir, attrs);
++	debug_dma_unmap_page(dev, addr, size, dir, false);
++}
++
++
+ #endif /* I40E_BACKPORT_COMPATH_H */

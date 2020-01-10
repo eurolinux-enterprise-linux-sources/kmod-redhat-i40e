@@ -1,0 +1,43 @@
+Revert 1c2fff6f3d1a "[net] make ndo_get_stats64 a void function" (upstream
+bc1f44709cf2) as network stack in 7.4 uses ol interface for the ndo_get_stats64
+method.
+
+Adjusted for the removal of FCoE code.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:12:26.502130254 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:17:42.658859702 +0100
+@@ -413,8 +413,9 @@
+  * Returns the address of the device statistics structure.
+  * The statistics are actually updated from the service task.
+  **/
+-static void i40e_get_netdev_stats_struct(struct net_device *netdev,
+-				  struct rtnl_link_stats64 *stats)
++static struct rtnl_link_stats64 * i40e_get_netdev_stats_struct(
++					      struct net_device *netdev,
++					      struct rtnl_link_stats64 *stats)
+ {
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+ 	struct i40e_ring *tx_ring, *rx_ring;
+@@ -423,10 +424,10 @@
+ 	int i;
+ 
+ 	if (test_bit(__I40E_VSI_DOWN, vsi->state))
+-		return;
++		return stats;
+ 
+ 	if (!vsi->tx_rings)
+-		return;
++		return stats;
+ 
+ 	rcu_read_lock();
+ 	for (i = 0; i < vsi->num_queue_pairs; i++) {
+@@ -466,6 +467,8 @@
+ 	stats->rx_dropped	= vsi_stats->rx_dropped;
+ 	stats->rx_crc_errors	= vsi_stats->rx_crc_errors;
+ 	stats->rx_length_errors	= vsi_stats->rx_length_errors;
++
++	return stats;
+ }
+ 
+ /**

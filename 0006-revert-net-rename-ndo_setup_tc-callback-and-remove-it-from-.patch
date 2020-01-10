@@ -1,0 +1,17 @@
+Revert 2d369cdbefa4 "[net] rename ndo_setup_tc callback and remove it from
+kABI", as network stack in 7.4 use old .extended.ndo_setup_tc method name.
+
+Adjusted for the removal of FCoE code.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:12:12.503280938 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 07:12:19.585204705 +0100
+@@ -9463,7 +9463,7 @@
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller	= i40e_netpoll,
+ #endif
+-	.extended.ndo_setup_tc_rh = __i40e_setup_tc,
++	.extended.ndo_setup_tc	= __i40e_setup_tc,
+ 	.ndo_set_features	= i40e_set_features,
+ 	.ndo_set_vf_mac		= i40e_ndo_set_vf_mac,
+ 	.extended.ndo_set_vf_vlan	= i40e_ndo_set_vf_port_vlan,

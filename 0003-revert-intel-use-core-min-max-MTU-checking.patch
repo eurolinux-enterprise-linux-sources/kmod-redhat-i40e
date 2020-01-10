@@ -1,0 +1,55 @@
+Revert 7233d971918e "[netdrv] intel: use core min/max MTU checking" (upstream
+91c527a55664), as network stack in 7.4 uses the old ndo_change_mtu method.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_debugfs.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_debugfs.c	2018-02-27 06:24:11.134212789 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_debugfs.c	2018-02-27 06:34:11.816758135 +0100
+@@ -1739,7 +1739,7 @@
+ 			dev_info(&pf->pdev->dev, "change_mtu: no netdev for VSI %d\n",
+ 				 vsi_seid);
+ 		} else if (rtnl_trylock()) {
+-			vsi->netdev->netdev_ops->extended.ndo_change_mtu(vsi->netdev,
++			vsi->netdev->netdev_ops->ndo_change_mtu_rh74(vsi->netdev,
+ 								mtu);
+ 			rtnl_unlock();
+ 			dev_info(&pf->pdev->dev, "change_mtu called\n");
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 06:33:45.788030505 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-02-27 06:34:11.817758125 +0100
+@@ -2427,9 +2427,14 @@
+ static int i40e_change_mtu(struct net_device *netdev, int new_mtu)
+ {
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
++	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+ 	struct i40e_vsi *vsi = np->vsi;
+ 	struct i40e_pf *pf = vsi->back;
+ 
++	/* MTU < 68 is an error and causes problems on some kernels */
++	if ((new_mtu < 68) || (max_frame > I40E_MAX_RXBUFFER))
++		return -EINVAL;
++
+ 	netdev_info(netdev, "changing MTU from %d to %d\n",
+ 		    netdev->mtu, new_mtu);
+ 	netdev->mtu = new_mtu;
+@@ -9451,7 +9456,7 @@
+ 	.ndo_set_rx_mode	= i40e_set_rx_mode,
+ 	.ndo_validate_addr	= eth_validate_addr,
+ 	.ndo_set_mac_address	= i40e_set_mac,
+-	.extended.ndo_change_mtu	= i40e_change_mtu,
++	.ndo_change_mtu_rh74	= i40e_change_mtu,
+ 	.ndo_do_ioctl		= i40e_ioctl,
+ 	.ndo_tx_timeout		= i40e_tx_timeout,
+ 	.ndo_vlan_rx_add_vid	= i40e_vlan_rx_add_vid,
+@@ -9608,11 +9613,6 @@
+ 	netdev->watchdog_timeo = 5 * HZ;
+ 	i40e_set_ethtool_ops(netdev);
+ 
+-	/* MTU range: 68 - 9706 */
+-	netdev->extended->min_mtu = ETH_MIN_MTU;
+-	netdev->extended->max_mtu = I40E_MAX_RXBUFFER -
+-			  (ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN);
+-
+ 	return 0;
+ }
+ 

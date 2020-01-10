@@ -1,0 +1,35 @@
+Commit 094bb319095c "[kernel] locking/barriers: prevent speculative execution
+based on Coverity scan results" (upstream 0e433329ca8e) introduced usage of
+gmb() macro that performs memory barrier that aims at preventing speculative
+execution. gmb() macro itself has been introduced in 08689fbd3d96 "[kernel]
+locking/barriers: introduce new memory barrier gmb()", and changed in
+ffcfa0d82240 "[x86] cpu/amd: Remove now unused definition of MFENCE_RDTSC
+feature".  The latter version is copied to the i40e_backport_compat.h header.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2018-02-27 06:36:49.001090528 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2018-02-27 06:36:50.484074515 +0100
+@@ -1,3 +1,10 @@
+ #ifndef I40E_BACKPORT_COMPATH_H
+ #define I40E_BACKPORT_COMPATH_H
++
++/*
++ * As the backport is x86_64-only, we can use definition from
++ * arch/x86/include/asm/barrier.h here directly.
++ */
++#define gmb() alternative(ASM_NOP3, "lfence", X86_FEATURE_LFENCE_RDTSC)
++
+ #endif /* I40E_BACKPORT_COMPATH_H */
+Index: src/drivers/net/ethernet/intel/i40e/i40e_debugfs.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_debugfs.c	2018-02-27 06:36:46.571116767 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_debugfs.c	2018-02-27 06:37:04.548922646 +0100
+@@ -31,6 +31,8 @@
+ 
+ #include "i40e.h"
+ 
++#include "i40e_backport_compat.h"
++
+ static struct dentry *i40e_dbg_root;
+ 
+ /**

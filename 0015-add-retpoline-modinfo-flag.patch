@@ -1,0 +1,17 @@
+This kmod is built with retpoline support (using inline thunks), however, kernel
+detects presence of retpolines in kmods based on presence of the respective
+modinfo flag, added by modpost script. As kmod is built against GA kernel whose
+modpost script lacks the appropriate code, let's add the flag manually in order
+to avoid bogus complaints from newer kernels.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-03-14 17:04:21.746671504 +0100
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2018-03-15 20:33:20.361097216 +0100
+@@ -110,6 +110,7 @@
+ MODULE_DESCRIPTION("Intel(R) Ethernet Connection XL710 Network Driver");
+ MODULE_LICENSE("GPL");
+ MODULE_VERSION(DRV_VERSION);
++MODULE_INFO(retpoline, "Y");
+ 
+ static struct workqueue_struct *i40e_wq;
+ 
