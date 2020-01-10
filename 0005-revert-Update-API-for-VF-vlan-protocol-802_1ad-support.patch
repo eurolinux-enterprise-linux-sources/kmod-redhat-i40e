@@ -1,0 +1,65 @@
+Commit a18e51ef4e4b "[net] Update API for VF vlan protocol 802.1ad support"
+(upstream 79aab093a0b5) introduced new version of ndo_set_vf_vlan callback,
+which adds VLAN protocol argument. ixgbe, however, supports only 802.1q, so it
+does not benefits from this change.
+
+Backport changes: revert the commit.
+
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2017-05-03 20:06:25.450979152 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2017-05-24 15:49:22.681079032 +0200
+@@ -9439,7 +9439,7 @@
+ #endif
+ 	.ndo_set_features	= i40e_set_features,
+ 	.ndo_set_vf_mac		= i40e_ndo_set_vf_mac,
+-	.extended.ndo_set_vf_vlan	= i40e_ndo_set_vf_port_vlan,
++	.ndo_set_vf_vlan	= i40e_ndo_set_vf_port_vlan,
+ 	.ndo_set_vf_rate	= i40e_ndo_set_vf_bw,
+ 	.ndo_get_vf_config	= i40e_ndo_get_vf_config,
+ 	.ndo_set_vf_link_state	= i40e_ndo_set_vf_link_state,
+Index: src/drivers/net/ethernet/intel/i40e/i40e_virtchnl_pf.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_virtchnl_pf.c	2017-04-27 20:06:16.580995592 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_virtchnl_pf.c	2017-05-24 16:15:34.400094039 +0200
+@@ -2747,12 +2747,11 @@
+  * @vf_id: VF identifier
+  * @vlan_id: mac address
+  * @qos: priority setting
+- * @vlan_proto: vlan protocol
+  *
+  * program VF vlan id and/or qos
+  **/
+-int i40e_ndo_set_vf_port_vlan(struct net_device *netdev, int vf_id,
+-			      u16 vlan_id, u8 qos, __be16 vlan_proto)
++int i40e_ndo_set_vf_port_vlan(struct net_device *netdev,
++			      int vf_id, u16 vlan_id, u8 qos)
+ {
+ 	u16 vlanprio = vlan_id | (qos << I40E_VLAN_PRIORITY_SHIFT);
+ 	struct i40e_netdev_priv *np = netdev_priv(netdev);
+@@ -2774,12 +2773,6 @@
+ 		goto error_pvid;
+ 	}
+ 
+-	if (vlan_proto != htons(ETH_P_8021Q)) {
+-		dev_err(&pf->pdev->dev, "VF VLAN protocol is not supported\n");
+-		ret = -EPROTONOSUPPORT;
+-		goto error_pvid;
+-	}
+-
+ 	vf = &(pf->vf[vf_id]);
+ 	vsi = pf->vsi[vf->lan_vsi_idx];
+ 	if (!test_bit(I40E_VF_STAT_INIT, &vf->vf_states)) {
+Index: src/drivers/net/ethernet/intel/i40e/i40e_virtchnl_pf.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_virtchnl_pf.h	2017-04-27 20:06:16.580995592 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_virtchnl_pf.h	2017-05-03 20:06:25.464978987 +0200
+@@ -130,7 +130,7 @@
+ /* VF configuration related iplink handlers */
+ int i40e_ndo_set_vf_mac(struct net_device *netdev, int vf_id, u8 *mac);
+ int i40e_ndo_set_vf_port_vlan(struct net_device *netdev, int vf_id,
+-			      u16 vlan_id, u8 qos, __be16 vlan_proto);
++			      u16 vlan_id, u8 qos);
+ int i40e_ndo_set_vf_bw(struct net_device *netdev, int vf_id, int min_tx_rate,
+ 		       int max_tx_rate);
+ int i40e_ndo_set_vf_trust(struct net_device *netdev, int vf_id, bool setting);

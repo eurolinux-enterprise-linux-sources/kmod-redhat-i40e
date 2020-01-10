@@ -1,0 +1,30 @@
+Commit 18ad1c654448 "[net] introduce csum_replace_by_diff() helper" (upstream
+8050c0f0274a "bpf: allow bpf_csum_diff to feed bpf_l3_csum_replace as well")
+introduced csum_replace_by_diff() helper function to Y-satream, along with its
+removal from i40e tree.
+
+Backport change: add implementation of csum_replace_by_diff() from "[net]
+introduce csum_replace_by_diff() helper" to i40e_backport_compat.h.
+Index: src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2017-04-27 20:00:26.253165510 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2017-04-27 20:00:28.711136251 +0200
+@@ -2,6 +2,7 @@
+ #define _RH_I40E_BACKPORT_COMPAT_H_
+ 
+ #include <net/udp_tunnel.h>
++#include <net/checksum.h>
+ #include <linux/pci.h>
+ 
+ 
+@@ -67,4 +68,10 @@
+ 			pci_select_bars(pdev, IORESOURCE_MEM));
+ }
+ 
++
++static inline void csum_replace_by_diff(__sum16 *sum, __wsum diff)
++{
++	*sum = csum_fold(csum_add(diff, ~csum_unfold(*sum)));
++}
++
+ #endif /* #ifndef _RH_I40E_BACKPORT_COMPAT_H_ */

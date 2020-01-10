@@ -1,0 +1,165 @@
+Commit 6bc6172d010 "[net] Combine GENEVE and VXLAN port notifiers into single
+functions" (upstream commit e7b3db5e60e8) along with 2be6b0029218 "[net] Merge
+VXLAN and GENEVE push notifiers into a single notifier" (upstream commit
+7c46a640de6f) introduced common framework for L2 UDP tunneling protocols such
+as VXLAN and GENEVE.
+
+Commit 32d6772ecf7 "[netdrv] i40e: Move all UDP port notifiers to single
+function" (upstream 06a5f7f167c5) starts using these new notifiers instead of
+old ones.
+
+Backport changes:
+ * Add wrapper functions (i40e_{add,del}_{vxlan,geneve}_tunnel_port) for the
+   new generic UDP port addition/removal callbacks
+   (i40e_udp_tunnel_{add,del}), which allow using these new callbacks with
+   old callees (.ndo_{add,del}_{vxlan,geneve}_port).
+ * Wire up these wrappers to the old callees instead new ones
+   (.extended.ndo_udp_tunnel_{add,del} are non-existent in 7.3 kernel).
+ * Add supplement enumerations (udp_parsable_tunnel_type) and types
+   (udp_tunnel_info) which are used by new i40e code and are not present in the
+   7.3 kernel.
+ * Implement udp_tunnel_get_rx_info() function which calls notifiers both with
+   NETDEV_OFFLOAD_PUSH_VXLAN and NETDEV_OFFLOAD_PUSH_GENEVE events.
+
+Index: src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2017-04-27 19:21:08.333216409 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2017-04-27 19:27:52.435406613 +0200
+@@ -1,4 +1,44 @@
+ #ifndef _RH_I40E_BACKPORT_COMPAT_H_
+ #define _RH_I40E_BACKPORT_COMPAT_H_
+ 
++#include <net/udp_tunnel.h>
++
++
++/* -- List of parsable UDP tunnel types --
++ *
++ * Adding to this list will result in serious debate.  The main issue is
++ * that this list is essentially a list of workarounds for either poorly
++ * designed tunnels, or poorly designed device offloads.
++ *
++ * The parsing supported via these types should really be used for Rx
++ * traffic only as the network stack will have already inserted offsets for
++ * the location of the headers in the skb.  In addition any ports that are
++ * pushed should be kept within the namespace without leaking to other
++ * devices such as VFs or other ports on the same device.
++ *
++ * It is strongly encouraged to use CHECKSUM_COMPLETE for Rx to avoid the
++ * need to use this for Rx checksum offload.  It should not be necessary to
++ * call this function to perform Tx offloads on outgoing traffic.
++ */
++enum udp_parsable_tunnel_type {
++	UDP_TUNNEL_TYPE_VXLAN,		/* RFC 7348 */
++	UDP_TUNNEL_TYPE_GENEVE,		/* draft-ietf-nvo3-geneve */
++};
++
++
++struct udp_tunnel_info {
++	unsigned short type;
++	sa_family_t sa_family;
++	__be16 port;
++};
++
++
++static inline void udp_tunnel_get_rx_info(struct net_device *dev)
++{
++	ASSERT_RTNL();
++	call_netdevice_notifiers(NETDEV_OFFLOAD_PUSH_VXLAN, dev);
++	call_netdevice_notifiers(NETDEV_OFFLOAD_PUSH_GENEVE, dev);
++}
++
++
+ #endif /* #ifndef _RH_I40E_BACKPORT_COMPAT_H_ */
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2017-04-27 17:45:31.464756733 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2017-04-27 19:34:42.898521910 +0200
+@@ -31,7 +31,8 @@
+ /* Local includes */
+ #include "i40e.h"
+ #include "i40e_diag.h"
+-#include <net/udp_tunnel.h>
++#include <net/geneve.h>
++#include <net/vxlan.h>
+ 
+ const char i40e_driver_name[] = "i40e";
+ static const char i40e_driver_string[] =
+@@ -9082,6 +9083,32 @@
+ 	pf->flags |= I40E_FLAG_UDP_FILTER_SYNC;
+ }
+ 
++static void i40e_vxlan_tunnel_add(struct net_device *dev,
++				  sa_family_t sa_family,
++				  __be16 port)
++{
++	struct udp_tunnel_info ti;
++
++	ti.sa_family =	sa_family;
++	ti.port = port;
++	ti.type = UDP_TUNNEL_TYPE_VXLAN;
++
++	i40e_udp_tunnel_add(dev, &ti);
++}
++
++static void i40e_geneve_tunnel_add(struct net_device *dev,
++				   sa_family_t sa_family,
++				   __be16 port)
++{
++	struct udp_tunnel_info ti;
++
++	ti.sa_family =	sa_family;
++	ti.port = port;
++	ti.type = UDP_TUNNEL_TYPE_GENEVE;
++
++	i40e_udp_tunnel_add(dev, &ti);
++}
++
+ /**
+  * i40e_udp_tunnel_del - Get notifications about UDP tunnel ports that go away
+  * @netdev: This physical port's netdev
+@@ -9128,6 +9155,32 @@
+ 		    ntohs(port));
+ }
+ 
++static void i40e_vxlan_tunnel_del(struct net_device *dev,
++				  sa_family_t sa_family,
++				  __be16 port)
++{
++	struct udp_tunnel_info ti;
++
++	ti.sa_family =	sa_family;
++	ti.port = port;
++	ti.type = UDP_TUNNEL_TYPE_VXLAN;
++
++	i40e_udp_tunnel_del(dev, &ti);
++}
++
++static void i40e_geneve_tunnel_del(struct net_device *dev,
++					 sa_family_t sa_family,
++					 __be16 port)
++{
++	struct udp_tunnel_info ti;
++
++	ti.sa_family =	sa_family;
++	ti.port = port;
++	ti.type = UDP_TUNNEL_TYPE_GENEVE;
++
++	i40e_udp_tunnel_del(dev, &ti);
++}
++
+ static int i40e_get_phys_port_id(struct net_device *netdev,
+ 				 struct netdev_phys_item_id *ppid)
+ {
+@@ -9392,8 +9445,10 @@
+ 	.ndo_set_vf_link_state	= i40e_ndo_set_vf_link_state,
+ 	.ndo_set_vf_spoofchk	= i40e_ndo_set_vf_spoofchk,
+ 	.extended.ndo_set_vf_trust	= i40e_ndo_set_vf_trust,
+-	.extended.ndo_udp_tunnel_add	= i40e_udp_tunnel_add,
+-	.extended.ndo_udp_tunnel_del	= i40e_udp_tunnel_del,
++	.ndo_add_vxlan_port	= i40e_vxlan_tunnel_add,
++	.ndo_del_vxlan_port	= i40e_vxlan_tunnel_del,
++	.ndo_add_geneve_port	= i40e_geneve_tunnel_add,
++	.ndo_del_geneve_port	= i40e_geneve_tunnel_del,
+ 	.ndo_get_phys_port_id	= i40e_get_phys_port_id,
+ 	.ndo_fdb_add		= i40e_ndo_fdb_add,
+ 	.ndo_features_check	= i40e_features_check,

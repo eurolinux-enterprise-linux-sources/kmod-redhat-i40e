@@ -1,0 +1,41 @@
+Commit 9e1e5a642e28c "[net] gso: Support partial segmentation offload"
+(upstream 802ab55adc39a) and several following introduce support for GSO
+partial offlod on the kernel network stack side. Driver support has been added
+in 35d38985d67b "[netdrv] i40e/i40evf: Add support for GSO partial with
+UDP_TUNNEL_CSUM and GRE_CSUM" (upstream 1c7b4a23d12f63).
+
+Backport changes: since 7.3 kernel has no GSO partial support, define
+NETIF_F_TSO_MANGLEID and NETIF_F_GSO_PARTIAL flags as 0 and remove part of
+i40e_config_netdev with GSO partial features setup.
+
+Index: src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2017-04-27 19:58:47.867336585 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_backport_compat.h	2017-04-27 20:00:16.335283560 +0200
+@@ -4,6 +4,10 @@
+ #include <net/udp_tunnel.h>
+ 
+ 
++#define NETIF_F_TSO_MANGLEID 0
++#define NETIF_F_GSO_PARTIAL  0
++#define SKB_GSO_PARTIAL      (1 << 16)
++
+ /* -- List of parsable UDP tunnel types --
+  *
+  * Adding to this list will result in serious debate.  The main issue is
+Index: src/drivers/net/ethernet/intel/i40e/i40e_main.c
+===================================================================
+--- src.orig/drivers/net/ethernet/intel/i40e/i40e_main.c	2017-04-27 19:58:47.869336561 +0200
++++ src/drivers/net/ethernet/intel/i40e/i40e_main.c	2017-04-27 19:59:59.668481943 +0200
+@@ -9501,11 +9501,6 @@
+ 				   NETIF_F_RXCSUM		|
+ 				   0;
+ 
+-	if (!(pf->flags & I40E_FLAG_OUTER_UDP_CSUM_CAPABLE))
+-		netdev->gso_partial_features |= NETIF_F_GSO_UDP_TUNNEL_CSUM;
+-
+-	netdev->gso_partial_features |= NETIF_F_GSO_GRE_CSUM;
+-
+ 	/* record features VLANs can make use of */
+ 	netdev->vlan_features |= netdev->hw_enc_features |
+ 				 NETIF_F_TSO_MANGLEID;
